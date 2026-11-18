@@ -122,6 +122,9 @@
     },
     "grpc-container-template": {
       "package_json_hash": "d010e0a7285da9523c14e1af8f4459ae60a22f9b"
+    },
+    "jpeg-xl-template": {
+      "package_json_hash": "9c747f947d431f8ef25042988832a6ccf8675316"
     }
   }
 }

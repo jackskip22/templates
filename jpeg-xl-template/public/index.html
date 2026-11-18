@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>JPEG XL Images</title>
+		<style>
+			:root {
+				color-scheme: light dark;
+				--text: #000;
+				--back: #fff;
+				--quiet: #555;
+			}
+			@media (prefers-color-scheme: dark) {
+				:root {
+					--text: #fff;
+					--back: #000;
+					--quiet: #aaa;
+				}
+			}
+			body {
+				margin: 0;
+				background: var(--back);
+				color: var(--text);
+				font:
+					17px/1.5 system-ui,
+					sans-serif;
+			}
+			main {
+				max-width: 640px;
+				margin: 0 auto;
+				padding: 24px 16px 48px;
+			}
+			h1 {
+				font-size: 28px;
+				margin: 0 0 8px;
+			}
+			ul {
+				display: grid;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+				gap: 16px 12px;
+				list-style: none;
+				margin: 24px 0;
+				padding: 0;
+			}
+			img {
+				display: block;
+				width: 100%;
+				height: auto;
+				aspect-ratio: 1;
+				object-fit: cover;
+			}
+			figure {
+				margin: 0;
+			}
+			figcaption {
+				margin-top: 6px;
+				font-size: 14px;
+				line-height: 1.4;
+			}
+			#total {
+				font-weight: 600;
+			}
+			.credit {
+				color: var(--quiet);
+				font-size: 14px;
+			}
+			@media (min-width: 900px) {
+				main {
+					max-width: 1120px;
+					padding-top: 40px;
+				}
+				ul {
+					grid-template-columns: repeat(4, minmax(0, 1fr));
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<main>
+			<h1>JPEG XL Images</h1>
+			<p>
+				Four phone photographs. Browsers that show JPEG XL get smaller copies
+				that restore the same JPEGs.
+			</p>
+			<ul>
+				<li>
+					<figure>
+						<img
+							src="/images/mountain.jpg"
+							width="5248"
+							height="3072"
+							alt="A mountain meadow with a hut and pine trees under a blue sky"
+						/>
+						<figcaption></figcaption>
+					</figure>
+				</li>
+				<li>
+					<figure>
+						<img
+							src="/images/flowers.jpg"
+							width="4284"
+							height="4284"
+							alt="White dokudami flowers among green leaves"
+						/>
+						<figcaption></figcaption>
+					</figure>
+				</li>
+				<li>
+					<figure>
+						<img
+							src="/images/niagara.jpg"
+							width="6144"
+							height="8160"
+							alt="Dinner on a terrace overlooking Niagara Falls at dusk"
+						/>
+						<figcaption></figcaption>
+					</figure>
+				</li>
+				<li>
+					<figure>
+						<img
+							src="/images/balloon.jpg"
+							width="4000"
+							height="3000"
+							alt="A striped hot-air balloon in a blue sky"
+						/>
+						<figcaption></figcaption>
+					</figure>
+				</li>
+			</ul>
+			<p id="total"></p>
+			<p class="credit">
+				Photographs from Wikimedia Commons, each
+				<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>:
+				the mountain by VlaDexa, the flowers by Kozakura154, the dinner by G.
+				Edward Johnson, the balloon by PantheraLeo1359531.
+			</p>
+		</main>
+		<script>
+			// The Worker answers each address with JPEG XL or with the JPEG. The page asks for both sizes (headers only)
+			// and compares them with the bytes this browser was actually sent.
+			const megabytes = (bytes) => (bytes / 1e6).toFixed(1) + " MB";
+			async function size(src, accept) {
+				const response = await fetch(src, {
+					headers: { Accept: accept },
+					cache: "no-store",
+				});
+				response.body?.cancel();
+				return {
+					type: response.headers.get("Content-Type"),
+					bytes: Number(response.headers.get("Content-Length")),
+				};
+			}
+			const loaded = (img) =>
+				img.complete
+					? Promise.resolve()
+					: new Promise((done) => {
+							img.addEventListener("load", done, { once: true });
+							img.addEventListener("error", done, { once: true });
+						});
+			async function measure(img) {
+				const [jxl, jpeg] = await Promise.all([
+					size(img.src, "image/jxl"),
+					size(img.src, "image/jpeg"),
+					loaded(img),
+				]);
+				const sent = performance.getEntriesByName(img.src)[0]?.encodedBodySize;
+				const gotJxl = jxl.type === "image/jxl" && sent === jxl.bytes;
+				img.nextElementSibling.innerText = `JPEG ${megabytes(jpeg.bytes)}\nJPEG XL ${megabytes(jxl.bytes)}`;
+				return {
+					jxl: jxl.bytes,
+					jpeg: jpeg.bytes,
+					gotJxl,
+					known: Boolean(sent),
+				};
+			}
+			async function show() {
+				const all = await Promise.all(
+					[...document.querySelectorAll("main img")].map(measure),
+				);
+				const jxl = all.reduce((sum, one) => sum + one.jxl, 0);
+				const jpeg = all.reduce((sum, one) => sum + one.jpeg, 0);
+				const smaller = Math.round((1 - jxl / jpeg) * 100);
+				document.getElementById("total").textContent = all.every(
+					(one) => one.gotJxl,
+				)
+					? `This browser got JPEG XL: ${megabytes(jxl)} instead of ${megabytes(jpeg)}, ${smaller}% smaller.`
+					: all.every((one) => one.known)
+						? `This browser got the JPEGs: ${megabytes(jpeg)}. JPEG XL would be ${megabytes(jxl)}, ${smaller}% smaller.`
+						: `In all: JPEG ${megabytes(jpeg)}, JPEG XL ${megabytes(jxl)}, ${smaller}% smaller.`;
+			}
+			show();
+		</script>
+	</body>
+</html>
